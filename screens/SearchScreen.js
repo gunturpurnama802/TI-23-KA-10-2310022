@@ -8,19 +8,20 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
-  Alert
+  Alert,
+  Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+// DIKEMBALIKAN: Import getPopularCities
 import { searchLocations, getPopularCities } from '../services/locationService';
 
-export default function SearchScreen({ navigation, route }) {
+export default function SearchScreen({ navigation }) {
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  // DIKEMBALIKAN: Menggunakan state untuk kota populer manual
   const [popularCities] = useState(getPopularCities());
-  const { onLocationSelect } = route.params || {};
 
-  // Debounced search function
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchText.length >= 2) {
@@ -47,10 +48,14 @@ export default function SearchScreen({ navigation, route }) {
   };
 
   const handleLocationSelect = (location) => {
-    if (onLocationSelect) {
-      onLocationSelect(location);
-    }
-    navigation.goBack();
+    Keyboard.dismiss();
+    navigation.navigate('Home', {
+      location: {
+        name: location.name,
+        lat: location.lat,
+        lon: location.lon,
+      }
+    });
   };
 
   const renderLocationItem = ({ item }) => (
@@ -60,17 +65,11 @@ export default function SearchScreen({ navigation, route }) {
       activeOpacity={0.7}
     >
       <View style={styles.locationIcon}>
-        <Ionicons 
-          name={item.type === 'city' ? 'location' : 'location-outline'} 
-          size={20} 
-          color="#4C90FF" 
-        />
+        <Ionicons name="location-outline" size={20} color="#4C90FF" />
       </View>
       <View style={styles.locationInfo}>
         <Text style={styles.locationName}>{item.name}</Text>
-        <Text style={styles.locationDetails} numberOfLines={2}>
-          {item.fullName}
-        </Text>
+        <Text style={styles.locationDetails} numberOfLines={1}>{item.fullName}</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#ccc" />
     </TouchableOpacity>
@@ -89,26 +88,17 @@ export default function SearchScreen({ navigation, route }) {
     </TouchableOpacity>
   );
 
-  const clearSearch = () => {
-    setSearchText('');
-    setSearchResults([]);
-  };
+  const clearSearch = () => setSearchText('');
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pilih Lokasi</Text>
       </View>
 
-      {/* Search Input */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -123,66 +113,45 @@ export default function SearchScreen({ navigation, route }) {
             autoFocus={true}
           />
           {searchText.length > 0 && (
-            <TouchableOpacity 
-              onPress={clearSearch} 
-              style={styles.clearButton}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton} activeOpacity={0.7}>
               <Ionicons name="close-circle" size={20} color="#999" />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Content */}
       <View style={styles.content}>
         {loading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4C90FF" />
-            <Text style={styles.loadingText}>Mencari lokasi...</Text>
           </View>
         )}
 
         {searchText.length >= 2 && !loading && (
-          <View style={styles.resultsContainer}>
-            {searchResults.length > 0 ? (
-              <>
-                <Text style={styles.sectionTitle}>Hasil Pencarian</Text>
-                <FlatList
-                  data={searchResults}
-                  renderItem={renderLocationItem}
-                  keyExtractor={(item, index) => `search-${index}-${item.name}`}
-                  showsVerticalScrollIndicator={false}
-                  style={styles.resultsList}
-                />
-              </>
-            ) : (
+          <FlatList
+            data={searchResults}
+            renderItem={renderLocationItem}
+            keyExtractor={(item) => item.id.toString()}
+            ListHeaderComponent={() => <Text style={styles.sectionTitle}>Hasil Pencarian</Text>}
+            ListEmptyComponent={() => (
               <View style={styles.noResultsContainer}>
                 <Ionicons name="search" size={48} color="#ccc" />
-                <Text style={styles.noResultsText}>
-                  Tidak ada hasil untuk "{searchText}"
-                </Text>
-                <Text style={styles.noResultsSubtext}>
-                  Coba gunakan kata kunci yang berbeda
-                </Text>
+                <Text style={styles.noResultsText}>Tidak ada hasil untuk "{searchText}"</Text>
               </View>
             )}
-          </View>
+          />
         )}
 
         {searchText.length < 2 && !loading && (
-          <View style={styles.popularContainer}>
-            <Text style={styles.sectionTitle}>Kota Populer</Text>
-            <FlatList
-              data={popularCities}
-              renderItem={renderPopularCityItem}
-              keyExtractor={(item, index) => `popular-${index}-${item.name}`}
-              numColumns={2}
-              showsVerticalScrollIndicator={false}
-              style={styles.popularList}
-              columnWrapperStyle={styles.popularRow}
-            />
-          </View>
+          <FlatList
+            data={popularCities}
+            renderItem={renderPopularCityItem}
+            keyExtractor={(item) => item.name}
+            numColumns={2}
+            ListHeaderComponent={() => <Text style={styles.sectionTitle}>Kota Populer</Text>}
+            columnWrapperStyle={styles.popularRow}
+            contentContainerStyle={styles.listContainer}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -192,103 +161,97 @@ export default function SearchScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fff',
   },
   backButton: {
-    padding: 8,
-    marginRight: 8,
+    padding: 5,
+    marginRight: 15,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#333',
   },
   searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    height: 50,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: '#333',
-    paddingVertical: 8,
   },
   clearButton: {
-    padding: 4,
+    padding: 5,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 60,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  resultsContainer: {
-    flex: 1,
-    paddingTop: 16,
+  listContainer: {
+    paddingHorizontal: 15,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
-  resultsList: {
-    flex: 1,
+  popularRow: {
+    justifyContent: 'space-between',
+  },
+  popularCityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 12,
+    marginBottom: 10,
+    width: '48.5%',
+    borderWidth: 1,
+    borderColor: '#eee'
+  },
+  popularCityIcon: {
+    marginRight: 8,
+  },
+  popularCityName: {
+    color: '#333',
+    fontWeight: '500',
   },
   locationItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#f0f0f0'
   },
   locationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f8ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    marginRight: 15,
   },
   locationInfo: {
     flex: 1,
@@ -297,60 +260,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#333',
-    marginBottom: 2,
   },
   locationDetails: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    lineHeight: 20,
+    marginTop: 2,
   },
   noResultsContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 60,
+    paddingTop: 40,
   },
   noResultsText: {
+    marginTop: 15,
     fontSize: 16,
-    fontWeight: '500',
     color: '#666',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  noResultsSubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  popularContainer: {
-    flex: 1,
-    paddingTop: 16,
-  },
-  popularList: {
-    flex: 1,
-  },
-  popularRow: {
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  popularCityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 0.48,
-    marginBottom: 8,
-  },
-  popularCityIcon: {
-    marginRight: 8,
-  },
-  popularCityName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    flex: 1,
   },
 });

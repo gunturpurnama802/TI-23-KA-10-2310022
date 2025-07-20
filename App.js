@@ -6,6 +6,8 @@ import SplashScreen from './screens/SplashScreen';
 import HomeScreen from './screens/HomeScreen';
 import ForecastScreen from './screens/ForecastScreen';
 import MapScreen from './screens/MapScreen';
+import SearchScreen from './screens/SearchScreen';
+
 
 const Stack = createStackNavigator();
 
@@ -52,6 +54,15 @@ export default function App() {
             gestureEnabled: true,
           }}
         />
+        <Stack.Screen 
+          name="Search" 
+          component={SearchScreen}
+          options={{
+            animationEnabled: true,
+            gestureEnabled: true,
+          }}
+/>
+
       </Stack.Navigator>
     </NavigationContainer>
   );

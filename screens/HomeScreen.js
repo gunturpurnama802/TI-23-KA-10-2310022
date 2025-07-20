@@ -1,79 +1,90 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getLocationId, getCurrentWeather } from '../services/forecaApi';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
+  const [currentLocation, setCurrentLocation] = useState({
+    name: 'Bogor',
+    lat: -6.5950,
+    lon: 106.8161,
+  });
   const [weather, setWeather] = useState(null);
-  const [currentLocation, setCurrentLocation] = useState('Bogor');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Function to fetch weather for a given location
-  const fetchWeatherData = async (locationName) => {
+  const fetchWeatherData = useCallback(async (location) => {
+    if (!location || !location.name) {
+      setLoading(false);
+      setError('Lokasi tidak valid.');
+      return;
+    }
     setLoading(true);
+    setError(null);
+    setWeather(null);
     try {
-      const locId = await getLocationId(locationName);
+      const locId = await getLocationId(location.name);
       const data = await getCurrentWeather(locId);
       setWeather(data);
-    } catch (error) {
-      console.error('Error fetching weather:', error);
-      // Handle error - maybe show a toast or alert
+      setCurrentLocation(location);
+    } catch (e) {
+      const errorMessage = e.message || 'Terjadi kesalahan tidak diketahui.';
+      setError(errorMessage);
+      Alert.alert('Gagal Memuat Cuaca', errorMessage);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Initial load
-  useEffect(() => {
-    fetchWeatherData(currentLocation);
   }, []);
 
-  // Handle location selection from search
-  const handleLocationSelect = (location) => {
-    setCurrentLocation(location.name);
-    fetchWeatherData(location.name);
-  };
+  useEffect(() => {
+    fetchWeatherData(currentLocation);
+  }, [fetchWeatherData]);
 
-  // Navigate to search screen
+  useFocusEffect(
+    useCallback(() => {
+      const newLocation = route.params?.location;
+      if (newLocation && newLocation.name !== currentLocation.name) {
+        fetchWeatherData(newLocation);
+        navigation.setParams({ location: undefined });
+      }
+    }, [route.params?.location, currentLocation.name, fetchWeatherData, navigation])
+  );
+
   const openSearchScreen = () => {
-    navigation.navigate('Search', {
-      onLocationSelect: handleLocationSelect
-    });
+    navigation.navigate('Search');
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
-        <Text style={styles.loadingText}>Memuat cuaca...</Text>
-      </View>
-    );
-  }
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.loadingText}>Memuat cuaca...</Text>
+        </View>
+      );
+    }
 
-  if (!weather) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
+    if (error || !weather) {
+      return (
+        <View style={styles.loadingContainer}>
+          <Ionicons name="cloud-offline-outline" size={64} color="rgba(255, 255, 255, 0.7)" />
+          <Text style={styles.errorText}>Gagal Memuat Data</Text>
+          <Text style={styles.errorSubText}>
+            {error || 'Data cuaca untuk lokasi ini tidak tersedia.'}
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={openSearchScreen}>
+            <Text style={styles.retryButtonText}>Cari Lokasi Lain</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
-  return (
-    <View style={styles.container}>
-      {/* Header with search button */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.searchButton}
-          onPress={openSearchScreen}
-        >
-          <Ionicons name="search" size={16} color="rgba(255,255,255,0.8)" />
-          <Text style={styles.searchButtonText}>Cari lokasi...</Text>
-        </TouchableOpacity>
-      </View>
-      
-      {/* Main content */}
+    return (
       <View style={styles.content}>
-        <Text style={styles.city}>{currentLocation}</Text>
+        <Text style={styles.city} numberOfLines={1} adjustsFontSizeToFit>
+          {currentLocation.name || '-'}
+        </Text>
         <Text style={styles.date}>
           {new Date().toLocaleDateString('id-ID', {
             weekday: 'long',
@@ -81,8 +92,6 @@ export default function HomeScreen({ navigation }) {
             month: 'long'
           })}
         </Text>
-        
-        {/* Current time */}
         <Text style={styles.time}>
           {new Date().toLocaleTimeString('id-ID', {
             hour: '2-digit',
@@ -90,35 +99,49 @@ export default function HomeScreen({ navigation }) {
           })}
         </Text>
 
-        {/* Weather info box */}
         <View style={styles.weatherBox}>
-          <Text style={styles.temp}>{Math.round(weather.temperature)}°</Text>
-          <Text style={styles.desc}>{weather.symbolPhrase}</Text>
+          <Text style={styles.temp}>
+            {weather?.temperature != null ? `${Math.round(weather.temperature)}°` : '-'}
+          </Text>
+          <Text style={styles.desc}>{weather?.symbolPhrase || '-'}</Text>
           <View style={styles.detailsRow}>
             <View style={styles.detailItem}>
-              <Ionicons name="eye-outline" size={16} color="white" />
+              <Ionicons name="leaf-outline" size={16} color="white" />
               <Text style={styles.detail}>Angin</Text>
-              <Text style={styles.detailValue}>{weather.windSpeed} km/h</Text>
+              <Text style={styles.detailValue}>
+                {weather?.windSpeed != null ? `${weather.windSpeed} km/h` : '-'}
+              </Text>
             </View>
             <View style={styles.detailItem}>
               <Ionicons name="water-outline" size={16} color="white" />
               <Text style={styles.detail}>Kelembapan</Text>
-              <Text style={styles.detailValue}>{weather.relHumidity}%</Text>
+              <Text style={styles.detailValue}>
+                {weather?.relHumidity != null ? `${weather.relHumidity}%` : '-'}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Forecast button */}
-        <TouchableOpacity 
-          style={styles.forecastButton} 
-          onPress={() => navigation.navigate('Forecast', { 
-            location: currentLocation 
-          })}
+        <TouchableOpacity
+          style={styles.forecastButton}
+          onPress={() => navigation.navigate('Forecast', { location: currentLocation })}
         >
           <Text style={styles.forecastButtonText}>Laporan Perkiraan</Text>
           <Ionicons name="chevron-forward" size={20} color="#4C90FF" />
         </TouchableOpacity>
       </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.searchButton} onPress={openSearchScreen}>
+          <Ionicons name="search" size={16} color="rgba(255,255,255,0.8)" />
+          <Text style={styles.searchButtonText}>Cari lokasi...</Text>
+        </TouchableOpacity>
+      </View>
+      {renderContent()}
     </View>
   );
 }
@@ -133,11 +156,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#4C90FF',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   loadingText: {
     color: 'white',
     fontSize: 16,
     marginTop: 10,
+  },
+  errorText: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  errorSubText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 24,
+    backgroundColor: 'white',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  retryButtonText: {
+    color: '#4C90FF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',
@@ -172,6 +221,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
     marginBottom: 5,
+    paddingHorizontal: 10,
   },
   date: {
     fontSize: 16,
@@ -191,7 +241,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginBottom: 50,
-    backdropFilter: 'blur(10px)',
   },
   temp: {
     fontSize: 64,

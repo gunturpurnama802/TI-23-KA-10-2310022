@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Text, 
-  SafeAreaView, 
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  SafeAreaView,
   TextInput,
   FlatList,
   Keyboard,
@@ -34,24 +34,34 @@ export default function MapScreen({ navigation }) {
     }
 
     try {
-      // Using OpenStreetMap Nominatim API for geocoding
+      // PERBAIKAN: Tambahkan header 'User-Agent' yang wajib untuk Nominatim
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&accept-language=id`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&accept-language=id`,
+        {
+          headers: {
+            'User-Agent': 'ForeskyWeatherApp/1.0 (gunturpurnama802@gmail.com)'
+          }
+        }
       );
+
       const data = await response.json();
-      
+
+      if (!Array.isArray(data)) {
+        throw new Error("Format respons tidak valid");
+      }
+
       const locations = data.map(item => ({
         name: item.display_name.split(',')[0],
         fullName: item.display_name,
         lat: parseFloat(item.lat),
         lon: parseFloat(item.lon)
       }));
-      
+
       setSearchResults(locations);
       setShowSearchResults(true);
     } catch (error) {
       console.error('Error searching location:', error);
-      Alert.alert('Error', 'Gagal mencari lokasi. Coba lagi.');
+      Alert.alert('Error', 'Gagal mencari lokasi. Pastikan Anda terhubung ke internet.');
     }
   };
 
@@ -61,10 +71,10 @@ export default function MapScreen({ navigation }) {
     setSearchText(location.name);
     setShowSearchResults(false);
     Keyboard.dismiss();
-    
+
     // Update Windy map with new coordinates
     const newUrl = `https://embed.windy.com/embed2.html?lat=${location.lat}&lon=${location.lon}&detailLat=${location.lat}&detailLon=${location.lon}&width=650&height=450&zoom=10&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
-    
+
     if (webViewRef.current) {
       webViewRef.current.injectJavaScript(`window.location.href = '${newUrl}';`);
     }
@@ -94,13 +104,13 @@ export default function MapScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       {/* Header with search */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        
+
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="rgba(255,255,255,0.7)" style={styles.searchIcon} />
           <TextInput
@@ -192,7 +202,7 @@ export default function MapScreen({ navigation }) {
           <Ionicons name="home" size={20} color="white" />
           <Text style={styles.controlButtonText}>Bogor</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.controlButton}
           onPress={() => {
